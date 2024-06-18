@@ -1,0 +1,15 @@
+{ signal: [
+  { name: "i_clk", wave: 'ppppppppppppppppppp' },
+  { name: "sop", wave: '030................'},
+  
+  { name: "prority", wave: '0.40...............' ,data:['pro']},
+  { name: "da", wave: '0.50...............' ,data:['da']},
+  { name: "last_len", wave: '0.60...............' ,data:['len']},
+  { name: "hdr_vld", wave: '0.70...............' ,data:['vld']},
+  
+  { name: "blk_addr", wave: '0...80|.80|.80|.80.' ,data:['addr']},
+  { name: "blk_addr_vlt", wave: '0...90|.90|.90|.90.' ,data:['bvld']},
+  
+  { name: "eop", wave: '0................30'},
+  ]
+ }

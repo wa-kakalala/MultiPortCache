@@ -1,0 +1,15 @@
+######################
+# create by wkk
+# 2024/06/18
+######################
+# ignore fpga directory
+fpga
+# ignore ref directory
+ref
+# ignore sim/*/work
+sim/*/work
+sim/*/*.mti
+sim/*/*.mpf
+sim/*/*.bak
+sim/*/*.wlf
+sim/*/*.do
