@@ -3,7 +3,7 @@
 /***
 file: ecc_encoder.v
 author: zfy
-version: v10
+version: v20
 description: ecc encoder  
 
 ***/
@@ -13,33 +13,43 @@ module ecc_encoder #(
     parameter CODE_W = 6
 )
 (
-    input clk,
-    input reset,
+    input i_clk,
+    input i_rst_n,
 
-    input wire [DATA_W-1:0] in_data,
-    input wire in_vld,
+    input wire [DATA_W-1:0] i_data,
+    input wire i_vld,
 
-    output wire [CODE_W-1:0] code,
-    output wire out_vld
+    output reg [DATA_W-1:0] o_data,
+    output reg [CODE_W-1:0] o_code,
+    output reg o_vld
 
 );
 
 // declare
-    wire [CODE_W-1:0] hamming_code;
+    wire [CODE_W-1:0] ecc_code;
 
 
 
 //instantiate hamming encoder32
     hamming_encoder26  u_hamming_encoder (
-        .data                    ( in_data           ),
+        .data                    ( i_data           ),
 
-        .code                    (  hamming_code          )
+        .code                    (  ecc_code          )
     );
 
 
 //output
-    assign out_vld = in_vld;
-    assign code = hamming_code;
-
+    always @(posedge i_clk or negedge i_rst_n) begin
+        if( !i_rst_n ) begin
+            o_data <= 'b0;
+            o_code  <= 'b0;
+            o_vld   <= 'b0;
+        end
+        else begin
+            o_data <= i_data;
+            o_code  <= ecc_code;
+            o_vld   <= i_vld;
+        end
+    end
 
 endmodule

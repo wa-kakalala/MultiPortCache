@@ -13,7 +13,7 @@ parameter CODE_W  = 5 ;
 
 // ecc_encoder declare
 logic   clk                                   ;
-logic   reset                                 ;
+logic   rst_n                                 ;
 logic   [DATA_W-1:0]  in_data              ;
 logic   in_vld                              ;
 
@@ -39,15 +39,15 @@ ecc_encoder #(
     .DATA_W ( DATA_W ),
     .CODE_W ( CODE_W ))
  u_ecc_encoder (
-    .clk                     ( clk                   ),
-    .reset                   ( reset                 ),
-    .in_data                 ( in_data  [DATA_W-1:0] ),
-    .in_vld                  ( in_vld                ),
+    .i_clk                     ( clk                   ),
+    .i_rst_n                   ( rst_n                 ),
+    .i_data                 ( in_data  [DATA_W-1:0] ),
+    .i_vld                  ( in_vld                ),
 
-    .code                    ( encoded_code     [CODE_W-1:0] ),
-    .out_vld                 ( encoded_vld               )
+    .o_data                ( encoded_data     [DATA_W-1:0] ),     
+    .o_code                ( encoded_code     [CODE_W-1:0] ),
+    .o_vld                 ( encoded_vld               )
 );
-assign encoded_data = in_data;
 
 
 // simulate the process during SRAM
@@ -74,15 +74,15 @@ ecc_decoder #(
     .DATA_W ( DATA_W ),
     .CODE_W ( CODE_W  ))
  u_ecc_decoder (
-    .clk                     ( clk              ),
-    .reset                   ( reset            ),
-    .in_data                 ( unverified_data          ),
-    .in_code                 ( unverified_code          ),
-    .in_vld                  ( unverified_vld           ),
+    .i_clk                     ( clk              ),
+    .i_rst_n                   ( rst_n            ),
+    .i_data                 ( unverified_data          ),
+    .i_code                 ( unverified_code          ),
+    .i_vld                  ( unverified_vld           ),
 
-    .corrected_data          ( corrected_data   ),
-    .error_detected          ( error_detected   ),
-    .out_vld                 ( corrected_vld          )
+    .o_corrected_data          ( corrected_data   ),
+    .o_error_detected          ( error_detected   ),
+    .o_vld                      ( corrected_vld          )
 );
 
 
@@ -95,15 +95,17 @@ end
 
 initial
 begin
-    reset = 0;
+    rst_n = 0;
+    #(PERIOD*2); 
+    rst_n = 1;
 end
 
 
 initial begin
     // initial
     in_data = 'd0;
-    in_vld = 1'b1;
-    noise = 'd1;
+    in_vld = 1'b0;
+    noise = 'd0;
 end
 
 
@@ -111,17 +113,16 @@ end
 initial
 begin
 
-    for(int i =0; i<1000; i++) begin
-        in_data = in_data+1;
-        in_vld = 1'b1;
-        #(PERIOD);
-    end
+    #(PERIOD*100);
 
     for(int i =0; i<1000; i++) begin
-        in_data = in_data+1;
-        in_vld = 1'b0;
-        #(PERIOD);
+        @(posedge clk) begin
+            in_data <= in_data+1;
+            in_vld  <= 1'b1;
+            #(PERIOD);
+        end
     end
+
 
     $stop;
 end
