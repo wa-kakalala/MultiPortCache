@@ -8,23 +8,20 @@ module dg_ram #(
   input   logic   clk,
   input   logic   rst_n,
   
-  /*interface with fifo */
-  input    logic   i_fifo_ready,
-  output   logic   o_fifo_vld,
-  output   logic   [DATA_WIDTH-1: 0]   o_fifo_data      
-
+  /*interface */
+  input    logic   i_en,
+  input    logic   i_we, // 'b1: write    'b0: read
+  input    logic   [ADDR_WIDTH-1:0]    i_addr,
+  input    logic   [DATA_WIDTH-1: 0]   i_data,
+  output   logic   [DATA_WIDTH-1: 0]   o_data
 );
-
-//initial depth
-localparam INIT_DEPTH = 'd16;
 
 
 //memory
 localparam  DEPTH = 1 << ADDR_WIDTH ; // 2** ADDR_WIDTH
 logic [DATA_WIDTH-1:0] mem [DEPTH-1: 0];
 
-//ptr
-logic [ADDR_WIDTH-1:0]  addr;
+
 
 
 
@@ -34,46 +31,39 @@ logic [2:0] t_prior;
 logic [9:0] t_len;
 logic [9:0] t_wait_clk_num;
 
-initial begin: init_mem
-  integer i;
-  for( i = 0; i < DEPTH; i=i+1 ) begin
-      mem[i] =  'b0;
-  end
-
-  t_da = 'd0;
-  t_prior = 'd0;
-  t_len = 'd1;
-  t_wait_clk_num = 'd20;
-
-  for( i = 0; i < INIT_DEPTH; i=i+1 ) begin
-      t_da = t_da + 'd1;
-      t_prior = t_prior + 'd1;
-      t_len = t_len + 'd10;
-      t_wait_clk_num = t_wait_clk_num + 'd10;
-      mem[i] =  { {(DATA_WIDTH-10-10-3-4){1'b0}}, t_wait_clk_num, t_len, t_prior, t_da };
-  end
+initial begin
+    integer i;
+    for( i = 0; i < DEPTH; i=i+1 ) begin
+        mem[i] =  'b0;
+    end
+    
+    mem[0]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd64, 3'd6, 4'd1 };
+    mem[1]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd1023, 3'd7, 4'd6 };
+    mem[2]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd64, 3'd2, 4'd8 };
+    mem[3]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd1023, 3'd1, 4'd10 };
+    mem[4]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd944, 3'd6, 4'd1 };
+    mem[5]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd495, 3'd6, 4'd11 };
+    mem[6]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd242, 3'd7, 4'd8 };
+    mem[7]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd531, 3'd2, 4'd11 };
+    mem[8]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd109, 3'd6, 4'd14 };
+    mem[9]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd263, 3'd2, 4'd7 };
 end
 
 
 always @( posedge clk or negedge rst_n) begin
   if( !rst_n ) begin
-      addr <= 'b0;
-      o_fifo_data <= 'b0;
-      o_fifo_vld  <= 'b0;
+      o_data <= 'b0;
   end
   else begin
-    if( i_fifo_ready && (addr < INIT_DEPTH) ) begin
-        addr <= addr + 1'b1;
-        o_fifo_data <= mem[addr];
-        o_fifo_vld  <= 1'b1;
-    end
-    else begin
-        addr <= addr;
-        o_fifo_data <= mem[addr];
-        o_fifo_vld  <= 1'b0;
+    if( i_en ) begin
+        if( i_we ) 
+            mem[i_addr] <= i_data;
+        else
+            o_data <= mem[i_addr];
     end
   end
-end 
+end
+
 
 
 endmodule

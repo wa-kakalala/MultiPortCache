@@ -9,16 +9,19 @@ description: fetch control-command for dg_fifo and control data_gen according to
 
 
 module dg_fetch #(
-    parameter   FIFO_W  = 32
+    parameter   DATA_W  = 32,
+    parameter   ADDR_W  = 10,
+    parameter   FETCH_N = 16
 )
 (
     input clk,
     input rst_n,
 
-    /*interface with fifo */
-    input                   i_fifo_ready,
-    input   [FIFO_W-1:0]    i_fifo_data,
-    output  reg             o_fifo_rden,
+    /*interface with sram */
+
+    input       [DATA_W-1:0]    i_sram_data,
+    output  reg                 o_sram_rden,
+    output  reg [ADDR_W-1:0]    o_sram_addr,
 
     /*interface with data gen module */
     input                       i_dg_ready,
@@ -33,10 +36,11 @@ module dg_fetch #(
 
 
 //FSM
-localparam s_idle       =  2'd0;
-localparam s_fetch      =  2'd1;
-localparam s_wait       =  2'd2;
-localparam s_send       =  2'd3;
+localparam s_idle       =  3'd0;
+localparam s_fetch      =  3'd1;
+localparam s_get        =  3'd2;
+localparam s_wait       =  3'd3;
+localparam s_send       =  3'd4;
 
 
 reg     [3:0]       r_da;
@@ -46,11 +50,14 @@ reg     [9:0]       r_wait_clk_num;
 
 
 // cnt wait clk num
-reg [9:0] cnt;
+reg [9:0] cnt_wait;
 reg [9:0] wait_clk_num;
 
-reg [1:0] cstate, nstate;
+//cnt packet
+reg [$clog2(FETCH_N)-1 : 0]  cnt_packet;
 
+
+reg [2:0] cstate, nstate;
 always @(posedge clk or negedge rst_n) begin
     if( !rst_n)
         cstate <= s_idle;
@@ -66,19 +73,19 @@ always @(*) begin
     else begin
         case( cstate ) 
             s_idle: begin
-                if( i_fifo_ready && i_dg_ready )
+                if( (cnt_packet < FETCH_N) && i_dg_ready )
                     nstate = s_fetch;
                 else
                     nstate = s_idle;
             end
             s_fetch: begin
-                if( i_fifo_data[26:17] == 'h0 )
-                    nstate = s_send;
-                else
+                    nstate = s_get;
+            end
+            s_get: begin
                     nstate = s_wait;
             end
             s_wait: begin
-                if( cnt ==  ( r_wait_clk_num - 'b1) )
+                if( r_wait_clk_num== 'b0 ||  cnt_wait >=  ( r_wait_clk_num-'b1) )
                     nstate = s_send;
                 else
                     nstate = s_wait;
@@ -96,7 +103,8 @@ end
 
 always @(posedge clk or negedge rst_n) begin
     if( !rst_n ) begin
-        o_fifo_rden <= 'b0;
+        o_sram_rden <= 'b0;
+        o_sram_addr <= 'b0;
 
         o_da <= 'b0;
         o_prior <= 'b0;
@@ -110,28 +118,45 @@ always @(posedge clk or negedge rst_n) begin
                 o_prior <= 'b0;
                 o_len <= 'b0;
                 o_vld <= 'b0;
-                o_fifo_rden <= 'b0;
+
+                o_sram_rden <= 'b0;
+                o_sram_addr <= o_sram_addr;
             end
             s_fetch: begin
                 o_da <= 'b0;
                 o_prior <= 'b0;
                 o_len <= 'b0;
                 o_vld <= 'b0;
-                o_fifo_rden <= 'b1;
+
+                o_sram_rden <= 'b1;
+                o_sram_addr <= o_sram_addr;
+            end
+            s_get: begin
+                o_da <= 'b0;
+                o_prior <= 'b0;
+                o_len <= 'b0;
+                o_vld <= 'b0;
+
+                o_sram_rden <= 'b0;
+                o_sram_addr <= o_sram_addr + 'b1;
             end
             s_wait: begin
                 o_da <= 'b0;
                 o_prior <= 'b0;
                 o_len <= 'b0;
                 o_vld <= 'b0;
-                o_fifo_rden <= 'b0;
+                
+                o_sram_rden <= 'b0;
+                o_sram_addr <= o_sram_addr;
             end
             s_send: begin
                 o_da <= r_da;
                 o_prior <= r_prior;
                 o_len <= r_len;
                 o_vld <= 'b1;
-                o_fifo_rden <= 'b0;
+
+                o_sram_rden <= 'b0;
+                o_sram_addr <= o_sram_addr;
             end
             default: begin
                 nstate = s_idle;
@@ -152,11 +177,11 @@ always @(posedge clk or negedge rst_n ) begin
         r_wait_clk_num <= 'b0;
     end
     else begin
-        if( nstate == s_fetch) begin
-            r_da <= i_fifo_data[3:0];
-            r_prior <= i_fifo_data[6:4];
-            r_len <= i_fifo_data[16:7];
-            r_wait_clk_num <= i_fifo_data[26:17];
+        if( cstate == s_get) begin
+            r_da <= i_sram_data[3:0];
+            r_prior <= i_sram_data[6:4];
+            r_len <= i_sram_data[16:7];
+            r_wait_clk_num <= i_sram_data[26:17];
         end
         else begin
             r_da <= r_da;
@@ -171,16 +196,28 @@ end
 
 always @(posedge clk or negedge rst_n ) begin
     if( !rst_n || nstate == s_idle ) 
-        cnt <= 'b0;
+        cnt_wait <= 'b0;
     else begin
         if( nstate == s_wait )
-            cnt <= cnt + 'b1;
+            cnt_wait <= cnt_wait + 'b1;
         else
-            cnt <= cnt ;
+            cnt_wait <= cnt_wait ;
     end
 end
 
-
+always @(posedge clk or negedge rst_n ) begin
+    if( !rst_n ) begin
+        cnt_packet <= 'b0;
+    end
+    else begin
+        if( nstate == s_send ) begin
+            cnt_packet <= cnt_packet + 'b1;
+        end
+        else begin
+            cnt_packet <= cnt_packet ;
+        end
+    end
+end
 
 
 endmodule

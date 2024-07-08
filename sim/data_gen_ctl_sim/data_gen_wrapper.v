@@ -26,15 +26,11 @@ module data_gen_wrapper #(
 
 );
 
-wire    fifo_full;
-wire    fifo_wr_ready;
-wire    fifo_wren   ;
-wire    [GEN_INF_W-1:0]  fifo_wr_data;
 
-wire    fifo_empty;
-wire    fifo_rd_ready;
-wire    fifo_rden   ;
-wire    [GEN_INF_W-1:0]  fifo_rd_data;
+wire                        sram_rden   ;
+wire    [RAM_ADDR_W-1:0]    sram_addr   ;
+wire    [GEN_INF_W-1:0]     sram_data   ;
+
 
 wire            dg_ready;
 wire    [3:0]   dg_da;
@@ -44,53 +40,39 @@ wire            dg_vld;
 
 
 
-assign  fifo_rd_ready = !fifo_empty;
-assign  fifo_wr_ready = !fifo_full;
+
 
 
 dg_ram #(
     .DATA_WIDTH ( GEN_INF_W ),
-    .ADDR_WIDTH ( RAM_ADDR_W ))
+    .ADDR_WIDTH ( RAM_ADDR_W )
+)
  u_dg_ram (
     .clk                              (   clk                               ),
     .rst_n                            (   rst_n                             ),
-    .i_fifo_ready                     (   fifo_wr_ready                      ),
-
-    .o_fifo_vld                       (   fifo_wren                        ),
-    .o_fifo_data                      (   fifo_wr_data   )
+    .i_en                             (   sram_rden             ),
+    .i_we                             (    1'b0         ),
+    .i_addr                           (   sram_addr          ),
+    .i_data                           (   'b0          ),
+    .o_data                           (   sram_data   )
 );
 
 
-dg_fifo #(
-    .DATA_WIDTH ( GEN_INF_W ),
-    .ADDR_WIDTH ( FIFO_ADDR_W ),
-    .FWFT_EN    ( 1  ))
- u_dg_fifo (
-    .clk           ( clk            ),
-    .rst_n         ( rst_n          ),
-
-    .din           ( fifo_wr_data            ),
-    .wr_en         ( fifo_wren          ),
-    .rd_en         ( fifo_rden          ),
-    .dout          ( fifo_rd_data           ),
-
-    .full          ( fifo_full           ),
-    .almost_full   (            ),
-    .empty         ( fifo_empty     ),
-    .almost_empty  (    )
-);
 
 
 dg_fetch #(
-    .FIFO_W ( GEN_INF_W ))
+    .DATA_W ( GEN_INF_W ),
+    .ADDR_W ( RAM_ADDR_W  ),
+    .FETCH_N ( 10     )    
+)
  u_dg_fetch (
     .clk                     ( clk            ),
     .rst_n                   ( rst_n          ),
 
     /* interface with dg fifo*/
-    .i_fifo_ready            ( fifo_rd_ready   ),
-    .i_fifo_data             ( fifo_rd_data    ),
-    .o_fifo_rden             ( fifo_rden    ),
+    .i_sram_data            (  sram_data    ),
+    .o_sram_addr             ( sram_addr    ),
+    .o_sram_rden             ( sram_rden    ),
 
     /* interface with dg*/
     .i_dg_ready              ( dg_ready     ),
