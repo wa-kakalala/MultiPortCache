@@ -26,7 +26,7 @@ module tb_mem_manager;
     logic  almost_full                          ;
     logic  empty                                ;
 
-    logic [AWIDTH-1:0] the_rls_addr = 'hff; 
+    logic [AWIDTH-1:0] the_rls_addr = 'h0; 
 
 
 
@@ -58,7 +58,8 @@ module tb_mem_manager;
 
     task req_addr(
     );
-
+        automatic int random_n;
+        random_n = $urandom_range(1, 10);
         // one clk
         @(posedge clk) begin
             ocp_req <= 1;
@@ -67,11 +68,10 @@ module tb_mem_manager;
             ocp_req <= 0;
         end
 
-        // 请求成功或者full 请求不成功
-        wait(ocp_rsp || full);
+        //wait for ocp vld
+        wait( ocp_vld );
 
-        //wait
-        #(2* PERIOD);
+        #(random_n* PERIOD);
 
     endtask
 
@@ -80,6 +80,10 @@ module tb_mem_manager;
         input [AWIDTH-1:0] addr
     );
 
+        automatic int random_n;
+        random_n = $urandom_range(1, 10);
+
+        
         @(posedge clk) begin
             rls_block_addr <= addr;
             rls_vld <= 1'b1;
@@ -90,7 +94,7 @@ module tb_mem_manager;
             rls_vld <= 1'b0;
         end
 
-        #(2*PERIOD);
+        #(random_n* PERIOD);
 
     endtask
 
@@ -102,7 +106,7 @@ module tb_mem_manager;
         @(posedge clk) begin
             rls_block_addr <= rls_addr;
             rls_vld <= 1'b0;
-            ocp_req <= 'b1;
+            ocp_req <= 'b1;//
         end
         @(posedge clk) begin
             rls_block_addr <= rls_addr;
@@ -138,11 +142,11 @@ module tb_mem_manager;
 
     initial
     begin
-        #101;
+        #117;
 
-        for(int i=0; i<1000; i++) begin
-            req_addr();
-        end
+        // for(int i=0; i<1300; i++) begin
+        //     req_addr();
+        // end
 
         // rls_addr('h07 );
 
@@ -153,10 +157,10 @@ module tb_mem_manager;
         // for(int i=0; i<1000; i++) begin
         //     req_addr();
         // end
-         #1000;
+        //  #1000;
 
         
-        for(int i=0; i<1040; i++) begin
+        for(int i=0; i<1220; i++) begin
             req_rls_addr(the_rls_addr+i);
         end
 
