@@ -18,6 +18,7 @@ wire  o_sop                                ;
 wire  o_vld                                ;
 wire  [31:0]  o_data                     ;
 wire  o_eop                                ;
+wire  [15:0]    fetch_n                     ;
 
 
 initial
@@ -40,6 +41,7 @@ data_gen_wrapper  #(
     .clk                     ( clk              ),
     .rst_n                   ( rst_n            ),
 
+    .fetch_n                 ( fetch_n          ),
     .o_sop                   ( o_sop            ),
     .o_vld                   ( o_vld            ),
     .o_data                  ( o_data           ),

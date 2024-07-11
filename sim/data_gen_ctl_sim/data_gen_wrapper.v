@@ -10,13 +10,15 @@ description: data gen wrapper
 
 module data_gen_wrapper #(
     parameter GEN_INF_W = 32, // data gen information width
-    parameter FIFO_ADDR_W = 5,
-    parameter RAM_ADDR_W =5,
+    parameter RAM_ADDR_W =10,
     parameter DW     = 32    //data width
 )
 (
     input   clk,
     input   rst_n,
+
+
+    input   wire     [RAM_ADDR_W-1:0] fetch_n,
 
     /* interface of packet out,  */
     output  wire     o_sop,
@@ -49,7 +51,7 @@ dg_ram #(
 )
  u_dg_ram (
     .clk                              (   clk                               ),
-    .rst_n                            (   rst_n                             ),
+    // .rst_n                            (   rst_n                             ),
     .i_en                             (   sram_rden             ),
     .i_we                             (    1'b0         ),
     .i_addr                           (   sram_addr          ),
@@ -62,12 +64,13 @@ dg_ram #(
 
 dg_fetch #(
     .DATA_W ( GEN_INF_W ),
-    .ADDR_W ( RAM_ADDR_W  ),
-    .FETCH_N ( 10     )    
+    .ADDR_W ( RAM_ADDR_W  ) 
 )
  u_dg_fetch (
     .clk                     ( clk            ),
     .rst_n                   ( rst_n          ),
+
+    .fetch_n                (   fetch_n     ),
 
     /* interface with dg fifo*/
     .i_sram_data            (  sram_data    ),

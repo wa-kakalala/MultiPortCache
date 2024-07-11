@@ -2,11 +2,12 @@
 
 module dg_ram #(
     parameter DATA_WIDTH = 32,
-    parameter ADDR_WIDTH      = 10
+    parameter ADDR_WIDTH      = 10,
+    parameter ID             = 0
 )
 (
   input   logic   clk,
-  input   logic   rst_n,
+  // input   logic   rst_n, // if rst_n set, synthesis will get lut rather than sram 
   
   /*interface */
   input    logic   i_en,
@@ -33,35 +34,47 @@ logic [9:0] t_wait_clk_num;
 
 initial begin
     integer i;
+    // initialize 0 
     for( i = 0; i < DEPTH; i=i+1 ) begin
         mem[i] =  'b0;
     end
-    
-    mem[0]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd64, 3'd6, 4'd1 };
-    mem[1]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd1023, 3'd7, 4'd6 };
-    mem[2]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd64, 3'd2, 4'd8 };
-    mem[3]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd1023, 3'd1, 4'd10 };
-    mem[4]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd944, 3'd6, 4'd1 };
-    mem[5]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd495, 3'd6, 4'd11 };
-    mem[6]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd242, 3'd7, 4'd8 };
-    mem[7]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd531, 3'd2, 4'd11 };
-    mem[8]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd109, 3'd6, 4'd14 };
-    mem[9]= {{(DATA_WIDTH-'d27){1'b0}}, 10'd0, 10'd263, 3'd2, 4'd7 };
+
+    case(ID)
+      0: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat0.dat",  mem);  end
+      1: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat1.dat",  mem);  end
+      2: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat2.dat",  mem);  end
+      3: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat3.dat",  mem);  end
+      4: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat4.dat",  mem);  end
+      5: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat5.dat",  mem);  end
+      6: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat6.dat",  mem);  end
+      7: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat7.dat",  mem);  end
+      8: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat8.dat",  mem);  end
+      9: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat9.dat",  mem);  end
+      10: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat10.dat",  mem);  end
+      11: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat11.dat",  mem);  end
+      12: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat12.dat",  mem);  end
+      13: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat13.dat",  mem);  end
+      14: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat14.dat",  mem);  end
+      15: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat15.dat",  mem);  end
+    endcase 
+    // read file
+    $readmemh("",  mem);
+
 end
 
 
-always @( posedge clk or negedge rst_n) begin
-  if( !rst_n ) begin
-      o_data <= 'b0;
-  end
-  else begin
+always @( posedge clk ) begin
+  // if( !rst_n ) begin
+  //     o_data <= 'b0;
+  // end
+  // else begin
     if( i_en ) begin
         if( i_we ) 
             mem[i_addr] <= i_data;
         else
             o_data <= mem[i_addr];
     end
-  end
+  // end
 end
 
 

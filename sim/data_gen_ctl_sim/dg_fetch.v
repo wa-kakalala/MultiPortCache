@@ -10,15 +10,17 @@ description: fetch control-command for dg_fifo and control data_gen according to
 
 module dg_fetch #(
     parameter   DATA_W  = 32,
-    parameter   ADDR_W  = 10,
-    parameter   FETCH_N = 16
+    parameter   ADDR_W  = 10
 )
 (
     input clk,
     input rst_n,
 
-    /*interface with sram */
+    /* interface of config*/
+    input       [ADDR_W-1:0]          fetch_n,
 
+
+    /*interface with sram */
     input       [DATA_W-1:0]    i_sram_data,
     output  reg                 o_sram_rden,
     output  reg [ADDR_W-1:0]    o_sram_addr,
@@ -54,7 +56,9 @@ reg [9:0] cnt_wait;
 reg [9:0] wait_clk_num;
 
 //cnt packet
-reg [$clog2(FETCH_N)-1 : 0]  cnt_packet;
+
+reg [ADDR_W-1 : 0]  cnt_packet;
+// reg [$clog2(fetch_n)-1 : 0]  cnt_packet;
 
 
 reg [2:0] cstate, nstate;
@@ -73,7 +77,7 @@ always @(*) begin
     else begin
         case( cstate ) 
             s_idle: begin
-                if( (cnt_packet < FETCH_N) && i_dg_ready )
+                if( (cnt_packet < fetch_n) && i_dg_ready )
                     nstate = s_fetch;
                 else
                     nstate = s_idle;
@@ -159,7 +163,13 @@ always @(posedge clk or negedge rst_n) begin
                 o_sram_addr <= o_sram_addr;
             end
             default: begin
-                nstate = s_idle;
+                o_da <= 'b0;
+                o_prior <= 'b0;
+                o_len <= 'b0;
+                o_vld <= 'b0;
+
+                o_sram_rden <= 'b0;
+                o_sram_addr <= o_sram_addr;
             end
         endcase 
     end
