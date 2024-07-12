@@ -3,7 +3,8 @@
 # 2024/06/18
 ######################
 # ignore fpga directory
-fpga
+fpga/
+
 # ignore ref directory
 ref
 # ignore sim/*/work

@@ -93,7 +93,7 @@ always @(*) begin
                 nstate = s_send_data;
             end
             s_send_data: begin
-                if( cnt >= r_len)
+                if( cnt >= (r_len - 'd4) )
                     nstate = s_send_eop;
                 else
                     nstate = s_send_data;

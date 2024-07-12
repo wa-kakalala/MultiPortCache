@@ -11,12 +11,12 @@ description: data gen wrapper
 module data_gen_wrapper #(
     parameter GEN_INF_W = 32, // data gen information width
     parameter RAM_ADDR_W =10,
-    parameter DW     = 32    //data width
+    parameter DW     = 32,    //data width
+    parameter   ID      = 0     // port ID
 )
 (
     input   clk,
     input   rst_n,
-
 
     input   wire     [RAM_ADDR_W-1:0] fetch_n,
 
@@ -47,7 +47,8 @@ wire            dg_vld;
 
 dg_ram #(
     .DATA_WIDTH ( GEN_INF_W ),
-    .ADDR_WIDTH ( RAM_ADDR_W )
+    .ADDR_WIDTH ( RAM_ADDR_W ),
+    .ID         (    ID       )
 )
  u_dg_ram (
     .clk                              (   clk                               ),

@@ -39,26 +39,25 @@ initial begin
         mem[i] =  'b0;
     end
 
+    //read file to ram
     case(ID)
-      0: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat0.dat",  mem);  end
-      1: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat1.dat",  mem);  end
-      2: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat2.dat",  mem);  end
-      3: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat3.dat",  mem);  end
-      4: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat4.dat",  mem);  end
-      5: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat5.dat",  mem);  end
-      6: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat6.dat",  mem);  end
-      7: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat7.dat",  mem);  end
-      8: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat8.dat",  mem);  end
-      9: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat9.dat",  mem);  end
-      10: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat10.dat",  mem);  end
-      11: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat11.dat",  mem);  end
-      12: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat12.dat",  mem);  end
-      13: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat13.dat",  mem);  end
-      14: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat14.dat",  mem);  end
-      15: begin    $readmemh("D:\\Desktop\\data_gen_data\\dat15.dat",  mem);  end
+      0: begin    $readmemh("D:\\Desktop\\data_genformat\\dat0.dat",  mem);  end
+      1: begin    $readmemh("D:\\Desktop\\data_genformat\\dat1.dat",  mem);  end
+      2: begin    $readmemh("D:\\Desktop\\data_genformat\\dat2.dat",  mem);  end
+      3: begin    $readmemh("D:\\Desktop\\data_genformat\\dat3.dat",  mem);  end
+      4: begin    $readmemh("D:\\Desktop\\data_genformat\\dat4.dat",  mem);  end
+      5: begin    $readmemh("D:\\Desktop\\data_genformat\\dat5.dat",  mem);  end
+      6: begin    $readmemh("D:\\Desktop\\data_genformat\\dat6.dat",  mem);  end
+      7: begin    $readmemh("D:\\Desktop\\data_genformat\\dat7.dat",  mem);  end
+      8: begin    $readmemh("D:\\Desktop\\data_genformat\\dat8.dat",  mem);  end
+      9: begin    $readmemh("D:\\Desktop\\data_genformat\\dat9.dat",  mem);  end
+      10: begin    $readmemh("D:\\Desktop\\data_genformat\\dat10.dat",  mem);  end
+      11: begin    $readmemh("D:\\Desktop\\data_genformat\\dat11.dat",  mem);  end
+      12: begin    $readmemh("D:\\Desktop\\data_genformat\\dat12.dat",  mem);  end
+      13: begin    $readmemh("D:\\Desktop\\data_genformat\\dat13.dat",  mem);  end
+      14: begin    $readmemh("D:\\Desktop\\data_genformat\\dat14.dat",  mem);  end
+      15: begin    $readmemh("D:\\Desktop\\data_genformat\\dat15.dat",  mem);  end
     endcase 
-    // read file
-    $readmemh("",  mem);
 
 end
 

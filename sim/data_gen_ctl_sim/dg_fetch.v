@@ -17,8 +17,7 @@ module dg_fetch #(
     input rst_n,
 
     /* interface of config*/
-    input       [ADDR_W-1:0]          fetch_n,
-
+    input       [ADDR_W-1:0]          fetch_n, //the number of packets fetched
 
     /*interface with sram */
     input       [DATA_W-1:0]    i_sram_data,
@@ -53,12 +52,10 @@ reg     [9:0]       r_wait_clk_num;
 
 // cnt wait clk num
 reg [9:0] cnt_wait;
-reg [9:0] wait_clk_num;
 
-//cnt packet
-
-reg [ADDR_W-1 : 0]  cnt_packet;
-// reg [$clog2(fetch_n)-1 : 0]  cnt_packet;
+//sended packet number
+reg [ADDR_W-1 : 0]  sended_n;
+// reg [$clog2(fetch_n)-1 : 0]  sended_n;
 
 
 reg [2:0] cstate, nstate;
@@ -77,7 +74,7 @@ always @(*) begin
     else begin
         case( cstate ) 
             s_idle: begin
-                if( (cnt_packet < fetch_n) && i_dg_ready )
+                if( (sended_n < fetch_n) && i_dg_ready )
                     nstate = s_fetch;
                 else
                     nstate = s_idle;
@@ -217,14 +214,14 @@ end
 
 always @(posedge clk or negedge rst_n ) begin
     if( !rst_n ) begin
-        cnt_packet <= 'b0;
+        sended_n <= 'b0;
     end
     else begin
         if( nstate == s_send ) begin
-            cnt_packet <= cnt_packet + 'b1;
+            sended_n <= sended_n + 'b1;
         end
         else begin
-            cnt_packet <= cnt_packet ;
+            sended_n <= sended_n ;
         end
     end
 end
