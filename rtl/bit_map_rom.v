@@ -21,9 +21,12 @@ module bit_map_rom #(
     input  wire [$clog2(DEPTH)+$clog2(WIDTH)-1 : 0 ] wr_addr_2,
     input  wire  wr_val_2   ,
 
-
+    // 空闲的最高优先级地址
     output wire [$clog2(DEPTH)+$clog2(WIDTH)-1: 0] emp_ready_addr,
     output wire emp_ready_vld,
+
+    //可用块数目
+    output wire [$clog2(DEPTH)+$clog2(WIDTH): 0] emp_addr_num,
 
     output wire full,
     output wire almost_full,
@@ -45,10 +48,12 @@ module bit_map_rom #(
 
 
     //bit map group
-    wire   [DEPTH-1:0] grp;
+    wire   [DEPTH-1:0] grp; // used to indicate whether every row of bit map is full 
+    wire   [DEPTH-1:0] emp_grp; //used to indicate whether every row of bit map is empty
     generate
         for (d = 0; d < DEPTH; d = d + 1) begin : generate_grp
             assign grp[d] =  &memory[d]; //
+            assign emp_grp[d] = |memory[d];
         end
     endgenerate
 
@@ -65,9 +70,11 @@ module bit_map_rom #(
                 .bin_code        ( grp_emp_bin   )
     );
 
+
+
     reg [COL_W-1:0] grp_emp_bin_r1;
     reg grp_emp_vld_r1;
-    always @(posedge clk) begin
+    always @(posedge clk or posedge rst) begin
         if( rst )begin
             grp_emp_bin_r1 <= 'b0;
             grp_emp_vld_r1 <= 1'b0;
@@ -102,7 +109,7 @@ module bit_map_rom #(
     //emp bin
     reg [ROW_W+ COL_W -1: 0] emp_bin;
     reg emp_bin_vld;
-    always @(posedge clk) begin
+    always @(posedge clk or posedge rst ) begin
         if( rst )begin
             emp_bin <= 'b0;
             emp_bin_vld <= 1'b0;
@@ -127,23 +134,40 @@ module bit_map_rom #(
 
 
     //bit map write count
+    // have to make sure that wr_val_1 == 1 and wr_val_2 == 0
     reg [ROW_W+COL_W:0] wr_count;
-    always @(posedge clk) begin
+    always @(posedge clk or posedge rst) begin
         if( rst ) begin
             wr_count <= 'd0;
         end
         else begin
-            if(wr_en_1 && wr_val_1 && (memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] ^ wr_val_1) )
-                wr_count <= wr_count + 'd1; //write 1 with wr interface 1
-            else if(wr_en_1 && (!wr_val_1) && (memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] ^ wr_val_1) )
-                wr_count <= wr_count -'d1; //write 0 with wr interface 1
-            else if(wr_en_2 && wr_val_2 && (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] ^ wr_val_2) )
-                wr_count <= wr_count + 'd1; //write 1 with wr interface 2
-            else if(wr_en_2 && (!wr_val_2) && (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] ^ wr_val_2) )
-                wr_count <= wr_count -'d1; //write 0 with wr interface 2
-
-            else 
-                wr_count <= wr_count;
+            //
+            if( wr_en_1 && wr_en_2 ) begin
+                if(  wr_addr_1 == wr_addr_2 ) begin //if wr_addr2==wr_addr
+                    // if( memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0]] && wr_val_1 && wr_val_2 )
+                    //     wr_count <= wr_count;
+                    // else if( memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0]] && !(wr_val_1|wr_val_2) )
+                    //     wr_count <= wr_count - 'b1;
+                    // else
+                    //     wr_count <= (wr_val_1| wr_val_2)? wr_count + 'b1 : wr_count;
+                    wr_count <= (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ])?  wr_count : wr_count + 'b1;
+                end
+                else begin
+                    wr_count <= (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ])? wr_count : wr_count +1'b1;
+                end
+            end
+            else begin
+                if(wr_en_1 && wr_val_1 && (memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] ^ wr_val_1) ) 
+                    wr_count <= wr_count + 'd1; //write 1 with wr interface 1， and keep wr_count dont 
+                else if(wr_en_1 && (!wr_val_1) && (memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] ^ wr_val_1) )
+                    wr_count <= wr_count -'d1; //write 0 with wr interface 1
+                else if(wr_en_2 && wr_val_2 && (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] ^ wr_val_2) )
+                    wr_count <= wr_count + 'd1; //write 1 with wr interface 2
+                else if(wr_en_2 && (!wr_val_2) && (memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] ^ wr_val_2) )
+                    wr_count <= wr_count -'d1; //write 0 with wr interface 2
+                else 
+                    wr_count <= wr_count;
+            end
         end
     end
 
@@ -152,30 +176,35 @@ module bit_map_rom #(
     //empty and full， almost full flag
     assign full =  & grp; //
     assign almost_full =  (wr_count >= ( (1<<(ROW_W+COL_W)) - AMFULL_DIFF ) )? 1'b1 : 1'b0; //
-    assign empty = ~( |grp );
+    assign empty = ~( |emp_grp );
+    assign emp_addr_num = (1<<(ROW_W+COL_W)) - wr_count;
 
 
 
 
 
     //write and read memory
-    always @(posedge clk)begin
+    always @(posedge clk or posedge rst)begin
         if( rst ) begin
             for(i = 0;i < DEPTH; i = i + 1)
                 memory[i] <= {WIDTH{1'h0}};
         end
         else begin
-            if(wr_en_1 && wr_en_2 && (wr_addr_1^wr_addr_2 == { (ROW_W+COL_W){1'b0} } ) )
-                memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] <= wr_val_1 | wr_val_2; //wr_addr2==wr_addr1
+            if(wr_en_1 && wr_en_2 ) begin // if two wr signal synchronization
+                if(  wr_addr_1 == wr_addr_2 ) begin //if wr_addr2==wr_addr
+                    memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] <= wr_val_1 | wr_val_2; 
+                end
+                else begin 
+                    memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] <= wr_val_1; 
+                    memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] <= wr_val_2; 
+                end
+            end
             else if(wr_en_1)
                 memory[wr_addr_1>>ROW_W][ wr_addr_1[ROW_W-1:0] ] <= wr_val_1;
-            else if( wr_en_2) 
+            else if( wr_en_2)
                 memory[wr_addr_2>>ROW_W][ wr_addr_2[ROW_W-1:0] ] <= wr_val_2;
         end
     end
-
-
-
 
 
 

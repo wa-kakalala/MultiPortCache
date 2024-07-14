@@ -37,10 +37,10 @@ generate
                 prior[idx] <= 'b0;           
             end else if(i_update) begin
                 prior[idx] <= ('d1 << i_prior[idx] ) ;       
-            end else if(i_clr_vld) begin
-                prior[i_clr_port] <= 'b0;
+            end else if(i_clr_vld && (i_clr_port == idx)) begin
+                prior[idx] <= 'b0;
             end else begin
-                prior[i_clr_port] <= prior[i_clr_port];
+                prior[idx] <= prior[idx];
             end
         end
     end
@@ -64,7 +64,7 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
     if( !i_rst_n ) begin
         port_vld <= 'b0;
     end else begin
-        port_vld <= i_clr_port | i_update;
+        port_vld <= i_clr_vld | i_update;
     end
 end
 
@@ -72,7 +72,7 @@ logic [$clog2(PRIOR+1)-1:0] out_sel         ;
 logic                      out_vld         ;
 
 assign o_empty = ~( |port_pend) ;
-assign o_port_vld = port_vld & (~o_empty) & out_vld;
+assign o_port_vld = port_vld & (|port_pend) & out_vld;
 // always_ff @(posedge i_clk or negedge i_rst_n) begin
 //     if( !i_rst_n ) begin
 //         o_port_vld <= 'b0;

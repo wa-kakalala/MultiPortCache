@@ -30,7 +30,8 @@ module input_channel(
     output logic                       o_sram_w_vld    ,
     output logic [`DATA_WIDTH-1:0    ] o_sram_data     ,
     
-    output logic                       o_addr_req      
+    output logic                       o_addr_req      ,
+    output logic                       o_packet_end 
 );
 
 logic fifo_full              ;
@@ -99,7 +100,8 @@ input_ctrl input_ctrl_inst(
     .o_sram_addr     (sram_addr     ),
     .o_sram_addr_vld (sram_addr_vld ),
 
-    .o_addr_req      (o_addr_req    )
+    .o_addr_req      (o_addr_req    ),
+    .o_packet_end    (o_packet_end  )
 );
 
 write_sram write_sram_inst (

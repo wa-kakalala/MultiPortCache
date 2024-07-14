@@ -28,9 +28,12 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
     if( ! i_rst_n ) begin
         o_sram_addr    <= 'b0;
         o_sram_w_vld   <= 'b0;
-    end else begin
+    end else if( i_sram_addr_vld  ) begin
         o_sram_addr    <= i_sram_addr    ;
-        o_sram_w_vld   <= i_sram_addr_vld;
+        o_sram_w_vld   <= 1'b1;
+    end else begin
+        o_sram_addr    <= 'b0    ;
+        o_sram_w_vld   <= 1'b0;
     end
 end
 

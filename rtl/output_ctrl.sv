@@ -192,7 +192,7 @@ always_ff @( posedge i_clk or negedge i_rst_n ) begin
         s_wait_len : begin
         end
         s_len      : begin
-            send_times   <= ((i_len + 11'd4 ) >> 6 ) + |((i_len + 11'd4 ) & 11'b111_111)-1'b1;
+            send_times   <= ((i_len + 11'd4 ) >> 6 ) + |((i_len + 11'd4 ) & 11'b111_111)-'b1;
             last_r_times <= (((i_len + 11'd4 ) & 11'b111_111) >> 2) + |((i_len + 11'd4 ) & 11'b11) - 'b1 ;
             // send_times   <= ((i_len  ) >> 6 ) + |((i_len  ) & 11'b111_111) - 'b1;
             // last_r_times <= (((i_len ) & 11'b111_111) >> 2) + |((i_len  ) & 11'b11) - 'b1 ;

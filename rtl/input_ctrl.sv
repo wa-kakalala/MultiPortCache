@@ -29,23 +29,36 @@ module input_ctrl(
     output logic [`BLK_ADDR_WIDTH-1:0] o_sram_addr     ,
     output logic                       o_sram_addr_vld ,
 
-    output logic                       o_addr_req   
+    output logic                       o_addr_req      ,
+
+    output logic                       o_packet_end  
 );
 
 localparam s_idle       =  3'd0;
 localparam s_wait       =  3'd1;
 localparam s_init       =  3'd2;
-localparam s_fifo2sram  =  3'd3;
-localparam s_addr_req   =  3'd4;
+localparam s_init_wait  =  3'd3;
+localparam s_fifo2sram  =  3'd4;
 localparam s_lfifo2sram =  3'd5;
 
 logic [2:0]  curr_state        ;
 logic [2:0]  next_state        ;
 
 logic [4:0]  need_req_times    ;
-logic [4:0]  wr_times          ;
-logic [4:0]  last_wr_times     ;
+logic [3:0]  wr_times          ;
+logic [3:0]  last_wr_times     ;
 logic        addr_req_done     ;
+                     
+logic [`BLK_ADDR_WIDTH-1:0] blk_addr;
+always_ff @( posedge i_clk or negedge i_rst_n ) begin 
+    if( !i_rst_n) begin
+        blk_addr <= 'b0;
+    end else if( i_blk_addr_vld) begin
+        blk_addr <= i_blk_addr;
+    end else begin
+        blk_addr <= blk_addr;
+    end
+end
 
 always_ff @( posedge i_clk or negedge i_rst_n ) begin 
     if( !i_rst_n) begin
@@ -75,28 +88,24 @@ always_comb begin
             end
         end
         s_init: begin
-            next_state = s_addr_req;
+            next_state = s_init_wait;
+        end
+        s_init_wait: begin
+            if( i_blk_addr_vld ) begin
+                next_state = s_fifo2sram;
+            end else begin
+                next_state = s_init_wait;
+            end
         end
         s_fifo2sram: begin
-            if(wr_times == 'd16) begin
-                next_state = s_addr_req;
+            if(wr_times == 'd15 && (need_req_times == 'd1)) begin
+                next_state = s_lfifo2sram;
             end else begin
                 next_state = s_fifo2sram;
             end
         end
-        s_addr_req: begin
-            if( i_blk_addr_vld ) begin
-                if( need_req_times == 'd1 ) begin
-                    next_state = s_lfifo2sram;
-                end else begin
-                    next_state = s_fifo2sram;
-                end
-            end else begin
-                next_state = s_addr_req;
-            end
-        end
         s_lfifo2sram: begin
-            if( wr_times == last_wr_times ) begin
+            if( (wr_times == last_wr_times)) begin
                 next_state = s_idle;
             end else begin
                 next_state = s_lfifo2sram;
@@ -147,7 +156,7 @@ always_ff @( posedge i_clk or negedge i_rst_n ) begin
             wr_times       <= 'b0;
         end
         s_wait: begin
-            o_sop <= 1'b1;
+            need_req_times <= 'b0;
         end
         s_init: begin
             o_hdr_vld<='b1;
@@ -155,30 +164,42 @@ always_ff @( posedge i_clk or negedge i_rst_n ) begin
             o_prority <= i_wr_data[6:4];
             //need_req_times <= ((i_wr_data[16:7] + 11'd4 ) >> 6 ) + ((((i_wr_data[16:7] + 11'd4 ) & 11'b111_111 == 'b0 ))? 1'b0 : 1'b1);  // maybe bug
             //last_wr_times  <= (((i_wr_data[16:7] + 11'd4 ) & 11'b111_111) >> 2) + (((((i_wr_data[16:7] + 11'd4 ) & 11'b111_111) >> 2) & 'b11 == 'b0)?1'b0:1'b1);
-            need_req_times <= ((i_wr_data[16:7] + 11'd4 ) >> 6 ) + |(((i_wr_data[16:7] + 11'd4 ) ));  // maybe bug
-            last_wr_times  <= (((i_wr_data[16:7] + 11'd4 ) & 11'b111_111) >> 2) + |((i_wr_data[16:7] + 11'd4 ) & 11'b11 );
+            need_req_times <= ((i_wr_data[16:7] + 11'd4 ) >> 6 ) + |(((i_wr_data[16:7] + 11'd4 ) ) & 11'b111_111);  // maybe bug
+            last_wr_times  <= (((i_wr_data[16:7] + 11'd4 ) & 11'b111_111) >> 2) + |((i_wr_data[16:7] + 11'd4 ) & 11'b11 ) - 1'b1;
+            o_addr_req <= 1'b1;
+            o_sop <= 1'b1;
+            wr_times <= 'd15;
+        end
+        s_init_wait: begin
+            
         end
         s_fifo2sram: begin
-            need_req_times <= (wr_times == 'b0)? (need_req_times-1'b1):need_req_times;
-            o_sram_addr <= (wr_times == 'b0)?i_blk_addr:o_sram_addr+1'b1;
-            o_blk_addr     <=  (wr_times == 'b0)?i_blk_addr:'b0;
-            o_blk_addr_vld <=  (wr_times == 'b0)?1'b1:1'b0;
+            if( wr_times == 'd15 ) begin
+                o_sram_addr <= (i_blk_addr_vld == 'b1)?i_blk_addr:blk_addr;
+                wr_times <= 'd0;
+            end else begin
+                o_sram_addr <= o_sram_addr + 1'b1;
+                wr_times <= wr_times + 1'b1;
+            end
+
+            need_req_times <= (wr_times == 'b0 ) ?need_req_times -'d1:need_req_times;
+
+            o_addr_req      <=  (wr_times == 'd10) ? 1'b1:1'b0;
+            o_blk_addr      <=  (i_blk_addr_vld == 'b1)?i_blk_addr:'b0;
+            o_blk_addr_vld  <=  i_blk_addr_vld;
             o_sram_addr_vld <= 1'b1;
-            wr_times <= wr_times + 1'b1;
-        end
-        s_addr_req: begin
-            o_addr_req    <= ~addr_req_done;
-            addr_req_done <= 1'b1;
-            wr_times      <= 'b0;
+            o_eop           <=  (i_blk_addr_vld == 'b1 && need_req_times == 'd1)?1'b1:1'b0;
+
         end
         s_lfifo2sram: begin
-            need_req_times <= (wr_times == 'b0)? (need_req_times-1'b1):need_req_times;
-            o_blk_addr     <=  (wr_times == 'b0)?i_blk_addr:'b0;
-            o_blk_addr_vld <=  (wr_times == 'b0)?1'b1:1'b0;
-            o_eop          <=  (wr_times == 'b0)?1'b1:1'b0;
-            o_sram_addr <= (wr_times == 'b0)? i_blk_addr:o_sram_addr+1'b1;
+            if( wr_times == 'd15 ) begin
+                o_sram_addr <= blk_addr;
+                wr_times <= 'd0;
+            end else begin
+                o_sram_addr <= o_sram_addr + 1'b1;
+                wr_times <= wr_times + 1'b1;
+            end
             o_sram_addr_vld <= 1'b1;
-            wr_times <= wr_times + 1'b1;
         end 
         default: begin
 
@@ -186,5 +207,7 @@ always_ff @( posedge i_clk or negedge i_rst_n ) begin
         endcase
     end
 end
+
+assign o_packet_end = ( (curr_state == s_lfifo2sram) && ( wr_times == last_wr_times ) )? 1'b1: 1'b0;
 
 endmodule

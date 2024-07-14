@@ -112,7 +112,8 @@ end
 //++ 寄存器组定义与读写 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 localparam DEPTH = 1 << ADDR_WIDTH; // 等价于 2**ADDR_WIDTH
 
-(* ram_style ="distributed" *)
+// (* ram_style ="distributed" *)
+(* ram_style ="block" *)
 logic [DATA_WIDTH-1:0] mem [0:DEPTH-1]; // 在Vivado中可选两种实现方式(* ram_style ="block" *)
 
 
@@ -130,9 +131,13 @@ generate
     // Vivado FIFO在FIFO为空时, dout保持最后一个有效值, 为实现这一特性, 采用了下方的写法
     // 注意这两种写法的功能都是正确的
     logic [DATA_WIDTH-1:0] dout_old;
-    always_ff @(posedge clk) begin
-      if (rd_en && ~empty)
+    always_ff @(posedge clk or negedge rst_n) begin
+       if( !rst_n ) begin
+        dout_old <= 'b0;
+    end else if (rd_en && ~empty)
         dout_old <= mem[raddr]; // 存储上一个值
+      else 
+        dout_old <= 'b0;
     end
 
     logic [DATA_WIDTH-1:0] dout_r;
@@ -148,9 +153,13 @@ generate
   else begin
     logic [DATA_WIDTH-1:0] dout_r;
 
-    always_ff @(posedge clk) begin
-      if (rd_en && ~empty)
+    always_ff @(posedge clk or negedge rst_n) begin
+      if( !rst_n ) begin
+        dout_r <= 'b0;
+      end else if (rd_en && ~empty)
         dout_r <= mem[raddr];
+      else 
+        dout_r <= 'b0;
     end
 
     assign dout = dout_r;

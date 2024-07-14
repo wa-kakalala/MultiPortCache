@@ -19,6 +19,9 @@ module mem_manager#(
     output reg  ocp_rsp                    ,
     output reg [AWIDTH-1:0] ocp_block_addr ,
     output reg ocp_vld                     ,
+
+    // available/empty block num
+    output wire [AWIDTH:0]  emp_block_num   ,
     
     //sram flag signal
     output wire full                       ,
@@ -60,6 +63,8 @@ module mem_manager#(
 
         .emp_ready_addr          ( emp_ready_addr   ),
         .emp_ready_vld           ( emp_ready_vld    ),
+
+        .emp_addr_num            (  emp_block_num    ),
         .full                    ( full             ),
         .almost_full             ( almost_full      ),
         .empty                   ( empty            )
@@ -73,24 +78,39 @@ module mem_manager#(
 
 
     //state machine for occupying
-    reg [1:0] state;
-    parameter IDLE = 2'B00, OCP = 2'b01;
+    reg [2:0] cstate, nstate ;
 
-    always@(posedge clk) begin
+    parameter IDLE = 3'd0, OCP = 3'd1, RSP = 3'd2;
+
+    always @(posedge clk or negedge rst_n) begin
+        if( !rst_n)
+            cstate <= IDLE;
+        else
+            cstate <= nstate;
+    end
+
+    always@(*) begin
         if(!rst_n)
-            state <= IDLE;
+            nstate = IDLE;
         else begin
-            case(state)
+            case(cstate)
                 IDLE: begin
                     if(ocp_req && (!full) )
-                        state <= OCP;
+                        nstate = OCP;
+                    else
+                        nstate = IDLE;
                 end
                 OCP: begin
-                    if(ocp_rsp)
-                        state <= IDLE; 
+                    if( emp_ready_vld )
+                        nstate = RSP;
+                    else
+                        nstate = OCP;
+                end
+                RSP: begin
+                        nstate = IDLE;
                 end
                 default: begin
-                    state <= IDLE;
+                    nstate = IDLE;
                 end
             endcase
         end
@@ -98,47 +118,84 @@ module mem_manager#(
 
 
     //
-    always@(posedge clk) begin
+    always@(posedge clk or negedge rst_n) begin
         if(!rst_n) begin
             ocp_rsp <= 1'b0;
             ocp_block_addr <= 'd0;
             ocp_vld <= 1'b0;
         end
         else begin
-            if(state == IDLE || ocp_rsp ) begin
-                ocp_rsp <= 1'b0;
-                ocp_block_addr <= 'd0;
-                ocp_vld <= 1'b0;
-            end
-            else if( (state == OCP) && emp_ready_vld  ) begin
-                ocp_rsp <= 1'b1;
-                ocp_block_addr <= emp_ready_addr;
-                ocp_vld <= 1'b1;
-            end
-            else if( (state == OCP) && !emp_ready_vld ) begin
-                ocp_rsp <= 1'b0;
-                ocp_block_addr <= 'd0;
-                ocp_vld <= 1'b0;
-            end
+
+            case( nstate )
+                IDLE: begin
+                    ocp_rsp <= 1'b0;
+                    ocp_block_addr <= 'd0;
+                    ocp_vld <= 1'b0;
+                end
+                OCP: begin
+                    ocp_rsp <= 1'b0;
+                    ocp_block_addr <= 'd0;
+                    ocp_vld <= 1'b0;
+                end
+                RSP: begin
+                    ocp_rsp <= 1'b1;
+                    ocp_block_addr <= emp_ready_addr;
+                    ocp_vld <= 1'b1;
+                end
+                default: begin
+                    ocp_rsp <= 1'b0;
+                    ocp_block_addr <= 'd0;
+                    ocp_vld <= 1'b0;
+                end
+            endcase
+            // if( nstate == IDLE  ) begin
+            //     ocp_rsp <= 1'b0;
+            //     ocp_block_addr <= 'd0;
+            //     ocp_vld <= 1'b0;
+            // end
+            // else if( (nstate == OCP) && emp_ready_vld  ) begin
+            //     ocp_rsp <= 1'b1;
+            //     ocp_block_addr <= 'd0;
+            //     ocp_vld <= 1'b0;
+            // end
+            // else if( (nstate == OCP) && !emp_ready_vld ) begin
+            //     ocp_rsp <= 1'b0;
+            //     ocp_block_addr <= 'd0;
+            //     ocp_vld <= 1'b0;
+            // end
+            // else if( (nstate == RSP) && emp_ready_vld ) begin
+            //     ocp_rsp <= 1'b0;
+            //     ocp_block_addr <= emp_ready_addr;
+            //     ocp_vld <= 1'b1;
+            // end
+            // else if( (nstate == RSP) && !emp_ready_vld ) begin
+            //     ocp_rsp <= 1'b0;
+            //     ocp_block_addr <= 'd0;
+            //     ocp_vld <= 1'b0;
+            // end
         end
     end
 
 
-    always@(posedge clk) begin
+    always@(posedge clk or negedge rst_n) begin
         if(!rst_n) begin
             wr_en_1 <= 1'b0;
             wr_addr_1 <= 'd0;
         end
         else begin
-            if( state == IDLE ) begin
+            if( nstate == IDLE || nstate == OCP ) begin
                 wr_en_1 <= 1'b0;
                 wr_addr_1 <= 'd0;
             end
-            else if( (state == OCP) && emp_ready_vld ) begin
+            else if( (nstate == RSP) && emp_ready_vld ) begin
                 wr_en_1 <= 1'b1;
                 wr_addr_1 <= emp_ready_addr;
             end
-            else if( (state == OCP) && !emp_ready_vld ) begin
+            else if( (nstate == RSP) && !emp_ready_vld ) begin
+                wr_en_1 <= 1'b0;
+                wr_addr_1 <= 'd0;
+            end
+            else begin
                 wr_en_1 <= 1'b0;
                 wr_addr_1 <= 'd0;
             end
@@ -146,7 +203,7 @@ module mem_manager#(
     end
 
 
-    always@(posedge clk) begin
+    always@(posedge clk or negedge rst_n) begin
         if(!rst_n) begin
             wr_en_2 <= 1'b0;
             wr_addr_2 <= 'd0;

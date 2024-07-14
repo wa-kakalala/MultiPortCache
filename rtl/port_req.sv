@@ -37,8 +37,9 @@ localparam s_idle     = 3'd0;
 localparam s_update   = 3'd1;
 localparam s_getport  = 3'd2;
 localparam s_req      = 3'd3;
-localparam s_clr_port = 3'd4;
-localparam s_r_sram   = 3'd5;
+localparam s_req_wait = 3'd4;
+localparam s_clr_port = 3'd5;
+localparam s_r_sram   = 3'd6;
 
 logic [2:0]                 curr_state  ;
 logic [2:0]                 next_state  ;
@@ -89,6 +90,9 @@ always_comb begin
             end
         end
         s_req     : begin
+            next_state = s_req_wait;
+        end 
+        s_req_wait: begin
             if( i_resp[port] == 1'b1 ) begin
                 next_state = s_r_sram;
             end else if(i_nresp[port]==1'b1) begin
@@ -99,9 +103,9 @@ always_comb begin
         end
         s_clr_port: begin
             if(i_port_vld==1'b1) begin
-                next_state = s_idle;
-            end else if( i_empty == 1'b1 ) begin
                 next_state = s_getport;
+            end else if( i_empty == 1'b1 ) begin
+                next_state = s_idle;
             end else begin
                 next_state = s_clr_port;
             end
@@ -147,10 +151,13 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
             first_flag <= 1'b1;
         end
         s_getport : begin
-
+           
         end
         s_req     : begin
             o_req <= ('b1 << port);
+        end
+        s_req_wait: begin
+
         end
         s_clr_port: begin
             first_flag    <= 'b1;

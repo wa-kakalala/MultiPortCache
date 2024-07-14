@@ -10,8 +10,8 @@ module read_sram #(
     parameter BLK_AWIDTH = 10,
     parameter DWIDTH     = 32
 )(
-    input  logic                          i_clk               ,
-    input  logic                          i_rst_n             ,
+    input  logic                         i_clk                ,
+    input  logic                         i_rst_n              ,
 
     input  logic [AWIDTH-1:0]            i_blk_addr           ,
     input  logic                         i_blk_addr_vld       ,
@@ -26,13 +26,16 @@ module read_sram #(
     output logic                         o_sram_rd_en         ,
     output logic [AWIDTH-1:0]            o_sram_rd_addr       ,
 
-    output logic                          o_rd_sop            ,
-    output logic                          o_rd_eop            ,
-    output logic                          o_rd_vld            ,
-    output logic [DWIDTH-1:0]             o_rd_data           ,
+    output logic                         o_rd_sop             ,
+    output logic                         o_rd_eop             ,
+    output logic                         o_rd_vld             ,
+    output logic [DWIDTH-1:0]            o_rd_data            ,
 
-    output logic [DWIDTH-1:0]             o_pkt_len           ,
-    output logic                          o_pkt_len_vld       
+    output logic [DWIDTH-1:0]            o_pkt_hdr            ,
+    output logic                         o_pkt_hdr_vld        ,
+
+    output logic [DWIDTH-1:0]            o_crc                ,
+    output logic                         o_crc_vld            
 );
 
 localparam s_idle         =  3'd0;
@@ -59,6 +62,19 @@ always_ff @( posedge i_clk or negedge i_rst_n ) begin
         blk_addr <= i_blk_addr;
     end else begin
         blk_addr <= blk_addr;
+    end 
+end
+
+always_ff @( posedge i_clk or negedge i_rst_n ) begin
+    if(!i_rst_n || curr_state == s_idle ) begin
+        last_rd_blk <= 'b0;
+        last_rd_times <= 'b0;
+    end else if(i_last_blk_vld ) begin
+        last_rd_blk <= 1'b1;
+        last_rd_times <= i_last_blk_n;
+    end else begin
+        last_rd_blk <= last_rd_blk;
+        last_rd_times <= last_rd_times;
     end 
 end
 
@@ -121,9 +137,8 @@ always_ff@( posedge i_clk or negedge i_rst_n ) begin
         o_rd_sop            <= 'b0;
         o_rd_eop            <= 'b0;
         o_rd_vld            <= 'b0;
-        o_rd_data           <= 'b0;
-        o_pkt_len           <= 'b0;
-        o_pkt_len_vld       <= 'b0;
+        rd_times            <= 'b0;
+        o_pkt_hdr_vld       <= 'b0;
     end else begin
         o_read_finish       <= 'b0;
         o_read_almost_finish<= 'b0;
@@ -132,11 +147,11 @@ always_ff@( posedge i_clk or negedge i_rst_n ) begin
         o_rd_sop            <= 'b0;
         o_rd_eop            <= 'b0;
         o_rd_vld            <= 'b0;
-        o_rd_data           <= 'b0;
-        o_pkt_len           <= 'b0;
-        o_pkt_len_vld       <= 'b0;
+        o_pkt_hdr_vld       <= 'b0;
+        rd_times            <= rd_times;
         case( next_state )
         s_idle        : begin
+            rd_times <= 'b0;
         end
         s_rd_first_blk: begin
             o_sram_rd_addr <= i_blk_addr;
@@ -144,28 +159,40 @@ always_ff@( posedge i_clk or negedge i_rst_n ) begin
             o_rd_sop       <= 1'b1;
         end
         s_send_hdr    : begin
-            o_pkt_len      <= i_sram_rd_data[16:7];
-            o_pkt_len_vld  <= 1'b1;
             o_sram_rd_addr <= o_sram_rd_addr+1'b1;
+            o_pkt_hdr_vld  <= 1'b1;
             o_sram_rd_en   <= 1'b1;
+            rd_times       <= rd_times +1'b1;
+            o_rd_vld       <= 1'b1;
         end
         s_rd_sram     : begin
             if(rd_times == 'd15 ) begin
                 o_sram_rd_addr <= blk_addr;
-                o_read_finish  <= 1'b1;
+                rd_times       <= 'b0;
             end else begin
                 o_sram_rd_addr <= o_sram_rd_addr+1'b1;
+                rd_times       <= rd_times +1'b1;
             end
 
-            o_read_finish = (rd_times == 'd15) ? 1'b1 : 1'b0;
-            o_read_almost_finish = (rd_times == 'd7) ? 1'b1 : 1'b0;
+            o_read_finish <= (rd_times == 'd15) ? 1'b1 : 1'b0;
+            o_read_almost_finish <= (rd_times == 'd10) ? 1'b1 : 1'b0;
             o_sram_rd_en   <= 1'b1;
+            o_rd_vld       <= 1'b1;
         end
         s_rd_last_blk : begin
-            o_sram_rd_addr <= o_sram_rd_addr+1'b1;
+            if(rd_times == 'd15 ) begin
+                o_sram_rd_addr <= blk_addr;
+                rd_times       <= 'b0;
+            end else begin
+                o_sram_rd_addr <= o_sram_rd_addr+1'b1;
+                rd_times       <= rd_times +1'b1;
+            end
             o_sram_rd_en   <= 1'b1;
+            o_rd_vld       <= 1'b1;
         end
         s_rd_end      : begin
+            o_read_almost_finish <= 1'b1;
+            o_read_finish        <= 1'b1;
             o_rd_eop       <= 1'b1;
         end
         default       : begin
@@ -173,5 +200,11 @@ always_ff@( posedge i_clk or negedge i_rst_n ) begin
         endcase
     end
 end
+assign o_rd_data = (o_rd_vld == 1'b1)?i_sram_rd_data:'b0;
+
+assign o_pkt_hdr = (o_pkt_hdr_vld==1'b1)?i_sram_rd_data:'b0;
+
+assign o_crc_vld = o_rd_eop;
+assign o_crc     = (o_rd_eop==1'b1)?i_sram_rd_data:'b0;
 
 endmodule

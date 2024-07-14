@@ -7,9 +7,10 @@
 `timescale 1ps/1ps
 `include "mpcache.svh"
 module mux16to1 (
+    input  logic                    i_clk                       ,
     input  logic                    i_rst_n                     ,
-    input  logic                    i_en                        ,
 
+    input  logic                    i_en                        ,
     input  logic [$clog2(`IN_PORT_NUM)-1:0] i_sel               ,
 
     input  logic                    i_rd_eop  [`IN_PORT_NUM-1:0],

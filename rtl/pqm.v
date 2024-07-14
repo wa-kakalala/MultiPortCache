@@ -153,6 +153,8 @@ module pqm#(
     assign              o_addr_rls = addr_rls;
     
     reg        queue_empty_n;     //1:queue not empty
+    reg     first_addr;
+    reg     in_vld;
     always@(posedge i_clk or posedge i_rst)begin
         if(i_rst)begin
             queue_en_a <= 0;
@@ -169,7 +171,7 @@ module pqm#(
             if(i_addr_in_vld)begin
                 frame_last <= i_frame_last;
                 addr_in <= i_addr_in;
-                addr_in_cnt <= 1;
+                addr_in_cnt <= 'd1;
                 addr_last <= queue_addr[in_line][2*SM_AW:SM_AW+1];
 //                if(queue_addr[in_line][0]==1'b1)begin  //read old tail
 //                    queue_en_a <= 1;
@@ -204,7 +206,7 @@ module pqm#(
 //                    queue_wr_a <= 0;
 //                end  
                 if(addr_in_cnt == 1)begin
-                    if(queue_empty_n==1'b1 | queue_addr[in_line][0]==1'b1 )begin  //read old tail
+                    if(queue_empty_n==1'b1 | queue_addr[in_line][0]==1'b1 | ~first_addr)begin  //read old tail
                         queue_en_a <= 1;
                         queue_wr_a <= 0;
                         queue_addr_a <= addr_last;
@@ -275,7 +277,7 @@ module pqm#(
 //                queue_addr_b <= queue_addr[out_line][SM_AW:1];
             end
             else begin
-                if(addr_out_cnt == 4'd1)begin
+                if(addr_out_cnt == 4'd1)begin //read queue_addr tail
                     out_frame_last <= 0;
                     addr_rls_vld <= 1'b0;
                     if(i_addr_out_rdy)begin
@@ -292,31 +294,32 @@ module pqm#(
                         addr_out_vld <= 0;
                     end                  
                 end      
-                else if(addr_out_cnt == 4'd2)begin
+                else if(addr_out_cnt == 4'd2)begin //wait for read result
                     out_frame_last <= 0;
                     addr_rls_vld <= 1'b0;
                     addr_out_vld <= 0;
                     queue_en_b <= 0;
                     addr_out_cnt <= 4'd3;
                 end   
-                else if(addr_out_cnt == 4'd3)begin
-                    out_frame_last <= 0;
-                    addr_rls_vld <= 1'b0;
-                    addr_out_vld <= 0;
-                    queue_en_b <= 0;
-                    addr_out_cnt <= 4'd4;
-                end      
-                else if(addr_out_cnt == 4'd4)begin                                       
+//                else if(addr_out_cnt == 4'd3)begin //wait for read result
+//                    out_frame_last <= 0;
+//                    addr_rls_vld <= 1'b0;
+//                    addr_out_vld <= 0;
+//                    queue_en_b <= 0;
+//                    addr_out_cnt <= 4'd4;
+//                end      
+                else if(addr_out_cnt == 4'd3)begin   //release addr and                                     
                     if(i_addr_out_rdy)begin
                         addr_rls_vld <= 1;
                         addr_rls <= queue_addr[out_line][SM_AW:1];
                         if(queue_out_b[0] == 1)begin
                             out_frame_last <= 1;
-//                            addr_out_cnt <= 4'd0;   
+                            addr_out_cnt <= 4'd0;   
                             addr_out_vld <= 0;
                             queue_en_b <= 1'b0;
                         end                     
-                        else begin                            
+                        else begin      
+                            addr_out_cnt <= 4'd2;                      
                             addr_out_vld <= 1;
                             addr_out <= queue_out_b[SM_AW:1];
                             
@@ -325,11 +328,14 @@ module pqm#(
                             queue_addr_b <= queue_out_b[SM_AW:1];
 //                            queue_addr_b <= queue_addr[out_line][SM_AW:1]; 
                         end 
-                        if(out_frame_last)begin
-                            addr_out_cnt <= 4'd0; 
-                            addr_rls_vld <= 1'b0;
-                            out_frame_last <= 0;
-                        end
+//                        if(out_frame_last)begin
+////                            addr_out_cnt <= 4'd0; 
+//                            addr_rls_vld <= 1'b0;
+//                            out_frame_last <= 0;
+//                        end
+//                        else begin
+//                            addr_out_cnt <= 4'd2;
+//                        end
 //                        if(queue_out_b[SM_AW:1] == queue_addr[out_line][2*SM_AW:SM_AW+1])begin
 ////                        out_state <= 0;     
 ////                        o_sm_out_vld <= 1'b0;                                                   
@@ -356,8 +362,31 @@ module pqm#(
             end
         end
     end
+    
      
     //update queue_addr
+    always@(posedge i_clk or posedge i_rst)begin
+        if(i_rst)begin
+            in_vld <= 'b0;
+            first_addr <= 'b0;
+        end
+        else begin
+            if(i_vld)begin
+                in_vld <= 'b1;
+            end
+            else if(i_addr_in_vld)begin
+                in_vld <= 'b0;
+            end
+            if(in_vld&&i_addr_in_vld)begin
+                first_addr <= 1'b1;
+            end
+            else if(~in_vld&&i_addr_in_vld)begin
+                first_addr <= 1'b0;
+            end
+        end
+    end
+    
+    
     always@(posedge i_clk or posedge i_rst)begin
         if(i_rst)begin
             queue_empty_n <= 0;
@@ -365,8 +394,27 @@ module pqm#(
                 queue_addr[i] <= 0;
         end
         else begin
+//            if(addr_in_cnt == 1)begin
+//                if(queue_addr[in_line][0]==1'b0)begin
+//                    queue_empty_n <= 1;
+//                    if(!queue_empty_n && first_addr)begin
+//                        queue_addr[in_line][SM_AW:1] <= addr_in; 
+//                    end
+////                    queue_addr[in_line][SM_AW:1] <= addr_in;   
+//                    queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;
+//                    if(frame_last)begin
+//                        queue_addr[in_line][0]<=1'b1;
+//                        queue_empty_n <= 0;
+//                    end                  
+//                end
+//                else begin
+//                    queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;
+//                end
+                  
+//            end 
+
             if(addr_in_cnt == 1)begin
-                if(queue_addr[in_line][0]==1'b0)begin 
+                if(queue_addr[in_line][0]==1'b0 )begin 
                     queue_empty_n <= 1;      
                     if(queue_empty_n == 1)begin
                         queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;
@@ -375,21 +423,22 @@ module pqm#(
                             queue_empty_n <= 0;
                         end
                     end      
-                    else begin        
-                        queue_addr[in_line][SM_AW:1] <= addr_in;
-                        queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;
-                    end
-                    
-                    
+                    else begin 
+                        if(first_addr)begin                            
+                            queue_addr[in_line][SM_AW:1] <= addr_in;
+                        end               
+//                        queue_addr[in_line][SM_AW:1] <= addr_in;  
+                        queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;                                                
+                    end                   
                 end
                 else begin                   
                     queue_addr[in_line][2*SM_AW:SM_AW+1] <= addr_in;
                 end
             end   
-            if(addr_out_cnt == 4'd4 && i_addr_out_rdy)begin
+            if(addr_out_cnt == 4'd3 && i_addr_out_rdy)begin
                 queue_addr[out_line][SM_AW:1] <= queue_out_b[SM_AW:1];
-                if(queue_addr[out_line][2*SM_AW:SM_AW+1] == queue_out_b[SM_AW:1])begin
-                    queue_addr[out_line][0] <= 0;
+                if((queue_addr[out_line][2*SM_AW:SM_AW+1] == queue_out_b[SM_AW:1]))begin                   
+                       queue_addr[out_line][0] <= 0;
                 end
             end        
         end

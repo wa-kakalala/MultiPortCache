@@ -38,7 +38,7 @@ module dual_sram#(
         memory[addr_a_in] <= d_a_in;
       else
         d_a_out           <= memory[addr_a_in];
-    end
+    end 
   end
 
   always @(posedge clk_b_in)
