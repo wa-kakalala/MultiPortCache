@@ -13,3 +13,5 @@ sim/*/*.mpf
 sim/*/*.bak
 sim/*/*.wlf
 sim/*/*.do
+doc
+mcs
